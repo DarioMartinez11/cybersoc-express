@@ -1,0 +1,93 @@
+version: '3.8'
+
+services:
+  # --- ELASTIC STACK (SIEM/DASHBOARDS) ---
+  elasticsearch:
+    image: elasticsearch:7.17.15
+    container_name: cybersoc-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - elastic-data:/usr/share/elasticsearch/data
+
+  kibana:
+    image: kibana:7.17.15
+    container_name: cybersoc-kibana
+    volumes:
+      - ./configs/kibana.yml:/usr/share/kibana/config/kibana.yml:ro
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+
+  # --- FILEBEAT (RECOLECCIÓN) ---
+  filebeat:
+    image: elastic/filebeat:7.17.15
+    container_name: cybersoc-filebeat
+    user: root
+    command: ["--strict.perms=false"]
+    volumes:
+      - ./configs/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - /var/log:/var/log:ro
+      - ./logs:/logs:ro
+    depends_on:
+      - elasticsearch
+
+  # --- SHUFFLE (SOAR) ---
+  shuffle-opensearch:
+    image: opensearchproject/opensearch:2.9.0
+    container_name: cybersoc-shuffle-opensearch
+    environment:
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+      - bootstrap.memory_lock=true
+      - discovery.type=single-node
+      - DISABLE_INSTALL_DEMO_CONFIG=true
+      - DISABLE_SECURITY_PLUGIN=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - shuffle-database:/usr/share/opensearch/data
+
+  shuffle-backend:
+    image: ghcr.io/shuffle/shuffle-backend:latest
+    container_name: cybersoc-shuffle-backend
+    ports:
+      - "3002:3002"
+    environment:
+      - SHUFFLE_APP_URL=http://shuffle-frontend:80
+      - SHUFFLE_OPENSEARCH_URL=http://shuffle-opensearch:9200
+    volumes:
+      - shuffle-data:/shuffle/database
+    depends_on:
+      - shuffle-opensearch
+
+  shuffle-frontend:
+    image: ghcr.io/shuffle/shuffle-frontend:latest
+    container_name: cybersoc-shuffle-frontend
+    ports:
+      - "3001:80"
+    environment:
+      - REACT_APP_BACKEND_URL=http://shuffle-backend:3002
+    depends_on:
+      - shuffle-backend
+
+  # --- GENERACIÓN DE TRÁFICO ---
+  attacker:
+    image: alpine:latest
+    container_name: cybersoc-attacker
+    command: sh -c "apk add --no-cache python3 bash && tail -f /dev/null"
+    volumes:
+      - ./scripts:/scripts:ro
+      - ./logs:/logs:rw
+    working_dir: /scripts
+
+volumes:
+  elastic-data:
+  shuffle-data:
+  shuffle-database:

@@ -1,0 +1,10 @@
+﻿filebeat.inputs:
+- type: log
+  enabled: true
+  paths:
+    - /logs/attack.log
+  fields:
+    type: attack_simulation
+
+output.elasticsearch:
+  hosts: ["elasticsearch:9200"]

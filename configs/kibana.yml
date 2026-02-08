@@ -1,0 +1,9 @@
+server.name: kibana
+server.host: "0.0.0.0"
+elasticsearch.hosts: [ "http://cybersoc-elasticsearch:9200" ]
+monitoring.ui.container.elasticsearch.enabled: true
+
+# Las llaves mágicas que Kibana exige
+xpack.security.encryptionKey: "12345678901234567890123456789012"
+xpack.reporting.encryptionKey: "12345678901234567890123456789012"
+xpack.encryptedSavedObjects.encryptionKey: "12345678901234567890123456789012"
